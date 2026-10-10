@@ -67,7 +67,8 @@ def run_pipeline(pipeline_name: str, dataset: dict, label_names: list):
             print(f"  [{split}] Already exists – skipping.")
             continue
 
-        ds_split = dataset[split].cast_column("audio", Audio(sampling_rate=cfg.SAMPLE_RATE))
+        # Shuffle dataset before casting and subsetting to ensure both classes are represented
+        ds_split = dataset[split].shuffle(seed=cfg.SEED).cast_column("audio", Audio(sampling_rate=cfg.SAMPLE_RATE))
         n = cfg.MAX_SAMPLES or len(ds_split)
         n = min(n, len(ds_split))
 

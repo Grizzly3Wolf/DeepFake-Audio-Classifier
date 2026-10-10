@@ -120,12 +120,20 @@ def train_pipeline(pipeline_name: str) -> dict:
 
     # ── Model ─────────────────────────────────────────────────────────────────
     model     = build_model(pretrained=True).to(device)
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    
+    # Calculate class weights from training labels to handle extreme class imbalance
+    train_labels = train_ds.labels
+    class_counts = np.bincount(train_labels)
+    # Inverse frequency weighting
+    class_weights = len(train_labels) / (len(class_counts) * class_counts.astype(np.float32))
+    weight_tensor = torch.FloatTensor(class_weights).to(device)
+    
+    criterion = nn.CrossEntropyLoss(weight=weight_tensor, label_smoothing=0.1)
     optimizer = optim.AdamW(model.parameters(),
                             lr=cfg.LR, weight_decay=cfg.WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=cfg.NUM_EPOCHS, eta_min=1e-6)
-    scaler = torch.cuda.amp.GradScaler(enabled=device.type == "cuda")
+    scaler = torch.amp.GradScaler('cuda', enabled=device.type == "cuda")
 
     # ── History ───────────────────────────────────────────────────────────────
     history = {k: [] for k in ["train_loss", "val_loss", "val_acc", "val_eer"]}
@@ -144,7 +152,7 @@ def train_pipeline(pipeline_name: str) -> dict:
                                   leave=False, ncols=80):
             feats, labels = feats.to(device), labels.to(device)
             optimizer.zero_grad()
-            with torch.cuda.amp.autocast(enabled=device.type == "cuda"):
+            with torch.amp.autocast('cuda', enabled=device.type == "cuda"):
                 logits = model(feats)
                 loss   = criterion(logits, labels)
             scaler.scale(loss).backward()
@@ -163,7 +171,7 @@ def train_pipeline(pipeline_name: str) -> dict:
         with torch.no_grad():
             for feats, labels in val_loader:
                 feats, labels = feats.to(device), labels.to(device)
-                with torch.cuda.amp.autocast(enabled=device.type == "cuda"):
+                with torch.amp.autocast('cuda', enabled=device.type == "cuda"):
                     logits = model(feats)
                     loss   = criterion(logits, labels)
                 val_loss += loss.item() * feats.size(0)
@@ -222,7 +230,7 @@ def train_pipeline(pipeline_name: str) -> dict:
     with torch.no_grad():
         for feats, labels in test_loader:
             feats = feats.to(device)
-            with torch.cuda.amp.autocast(enabled=device.type == "cuda"):
+            with torch.amp.autocast('cuda', enabled=device.type == "cuda"):
                 logits = model(feats)
             probs = torch.softmax(logits, dim=1)[:, 1]
             all_scores.extend(probs.cpu().numpy())

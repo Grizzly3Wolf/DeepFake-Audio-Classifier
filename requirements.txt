@@ -25,3 +25,5 @@ opencv-python>=4.8.0
 
 # Progress bars
 tqdm>=4.66.0
+torchcodec
+torchaudio
