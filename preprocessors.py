@@ -8,9 +8,9 @@ and saved as a .npy file.
 Pipelines:
   1. Scalogram         – CWT (pywt) -> 2-D image
   2. Linear Spectrogram / CQT – librosa -> 2-D image
-  3. LFCC              – custom filterbank -> 2-D matrix
-  4. Log-Mel / MFCC   – librosa -> 2-D matrix
-  5. SSL Embeddings   – Wav2Vec 2.0 hidden states -> reshaped 2-D
+  3. Log-Mel Spectrogram – librosa mel filterbank -> 2-D matrix
+  4. MFCC              – librosa MFCC (+ deltas) -> 2-D matrix
+  5. SSL Embeddings    – Wav2Vec 2.0 hidden states -> reshaped 2-D
 """
 
 import numpy as np
@@ -103,53 +103,13 @@ def extract_linear_spec(wav: np.ndarray) -> np.ndarray:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pipeline 3 – LFCC (Linear Frequency Cepstral Coefficients)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _linear_filterbank(sr: int, n_fft: int, n_filters: int) -> np.ndarray:
-    """Build a linear-scale triangular filterbank (n_filters x (n_fft//2+1))."""
-    freqs = np.linspace(0, sr / 2, n_fft // 2 + 1)
-    lin_freqs = np.linspace(0, sr / 2, n_filters + 2)
-    fb = np.zeros((n_filters, len(freqs)))
-    for m in range(1, n_filters + 1):
-        f_m_minus = lin_freqs[m - 1]
-        f_m       = lin_freqs[m]
-        f_m_plus  = lin_freqs[m + 1]
-        for k, f in enumerate(freqs):
-            if f_m_minus <= f <= f_m:
-                fb[m - 1, k] = (f - f_m_minus) / (f_m - f_m_minus + 1e-10)
-            elif f_m < f <= f_m_plus:
-                fb[m - 1, k] = (f_m_plus - f) / (f_m_plus - f_m + 1e-10)
-    return fb.astype(np.float32)
-
-
-def extract_lfcc(wav: np.ndarray) -> np.ndarray:
-    """
-    Compute LFCC using a linear filterbank + DCT.
-    Returns (N_LFCC, T) float32 array.
-    """
-    from scipy.fft import dct
-
-    wav = _pad_or_trim(wav)
-    # STFT power spectrum
-    D = np.abs(librosa.stft(wav, n_fft=cfg.N_FFT, hop_length=cfg.HOP_LENGTH)) ** 2
-    # Linear filterbank
-    fb = _linear_filterbank(cfg.SAMPLE_RATE, cfg.N_FFT, cfg.N_LFCC * 2)
-    filter_energies = np.dot(fb, D)                          # (N_LFCC*2, T)
-    log_energies = np.log(filter_energies + 1e-9)
-    lfcc = dct(log_energies, type=2, axis=0, norm="ortho")   # (N_LFCC*2, T)
-    lfcc = lfcc[:cfg.N_LFCC, :]                              # keep first N_LFCC
-    return to_swin_input(lfcc.astype(np.float32))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Pipeline 4 – Log-Mel Spectrogram + MFCC
+# Pipeline 3 – Log-Mel Spectrogram
 # ─────────────────────────────────────────────────────────────────────────────
 
 def extract_logmel(wav: np.ndarray) -> np.ndarray:
     """
-    Log-Mel spectrogram stacked with MFCC delta-delta as extra rows.
-    Returns (N_MELS + N_MFCC, T) float32 array.
+    Log-Mel spectrogram using a mel-scale filterbank.
+    Returns (N_MELS, T) float32 array resized to (IMG_SIZE, IMG_SIZE).
     """
     wav = _pad_or_trim(wav)
 
@@ -157,14 +117,33 @@ def extract_logmel(wav: np.ndarray) -> np.ndarray:
         y=wav, sr=cfg.SAMPLE_RATE,
         n_fft=cfg.N_FFT, hop_length=cfg.HOP_LENGTH, n_mels=cfg.N_MELS,
     )
-    log_mel = librosa.power_to_db(mel, ref=np.max)           # (N_MELS, T)
+    log_mel = librosa.power_to_db(mel, ref=np.max)   # (N_MELS, T)
+    return to_swin_input(log_mel.astype(np.float32))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline 4 – MFCC (+ delta + delta-delta)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def extract_mfcc(wav: np.ndarray) -> np.ndarray:
+    """
+    MFCC stacked with its first- and second-order deltas.
+    Returns (N_MFCC * 3, T) float32 array resized to (IMG_SIZE, IMG_SIZE).
+
+    The three rows per coefficient encode static + velocity + acceleration,
+    giving the classifier richer temporal dynamics information.
+    """
+    wav = _pad_or_trim(wav)
 
     mfcc = librosa.feature.mfcc(
         y=wav, sr=cfg.SAMPLE_RATE, n_mfcc=cfg.N_MFCC,
         n_fft=cfg.N_FFT, hop_length=cfg.HOP_LENGTH,
-    )                                                         # (N_MFCC, T)
+    )                                                  # (N_MFCC, T)
 
-    combined = np.vstack([log_mel, mfcc])                     # (N_MELS+N_MFCC, T)
+    delta1 = librosa.feature.delta(mfcc, order=1)     # (N_MFCC, T)
+    delta2 = librosa.feature.delta(mfcc, order=2)     # (N_MFCC, T)
+
+    combined = np.vstack([mfcc, delta1, delta2])       # (N_MFCC*3, T)
     return to_swin_input(combined.astype(np.float32))
 
 
@@ -222,7 +201,7 @@ def extract_ssl_embeddings(wav: np.ndarray) -> np.ndarray:
 EXTRACTORS = {
     "scalogram":      extract_scalogram,
     "linear_spec":    extract_linear_spec,
-    "lfcc":           extract_lfcc,
     "logmel":         extract_logmel,
+    "mfcc":           extract_mfcc,
     "ssl_embeddings": extract_ssl_embeddings,
 }

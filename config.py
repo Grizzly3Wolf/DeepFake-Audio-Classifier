@@ -21,8 +21,8 @@ OUTPUT_ROOT = os.path.join(os.path.dirname(__file__), "outputs")
 PIPELINE_DIRS = {
     "scalogram":      os.path.join(OUTPUT_ROOT, "pipeline_1_scalogram"),
     "linear_spec":    os.path.join(OUTPUT_ROOT, "pipeline_2_linear_spec"),
-    "lfcc":           os.path.join(OUTPUT_ROOT, "pipeline_3_lfcc"),
-    "logmel":         os.path.join(OUTPUT_ROOT, "pipeline_4_logmel"),
+    "logmel":         os.path.join(OUTPUT_ROOT, "pipeline_3_logmel"),
+    "mfcc":           os.path.join(OUTPUT_ROOT, "pipeline_4_mfcc"),
     "ssl_embeddings": os.path.join(OUTPUT_ROOT, "pipeline_5_ssl_embeddings"),
 }
 
@@ -48,7 +48,6 @@ N_FFT         = 512
 HOP_LENGTH    = 128
 N_MELS        = 128
 N_MFCC        = 40
-N_LFCC        = 40
 CWT_SCALES    = 128   # number of CWT scales (rows of the scalogram)
 
 # CQT

@@ -12,7 +12,7 @@ Usage:
     python run_experiments.py --skip_preprocess
 
     # Run specific pipelines only
-    python run_experiments.py --pipeline scalogram lfcc
+    python run_experiments.py --pipeline scalogram logmel
 
     # Quick debug with limited samples
     python run_experiments.py --max_samples 200 --epochs 2
@@ -156,8 +156,8 @@ def save_markdown_report(all_results: list, path: str):
         "|---|---|---|\n",
         "| scalogram | CWT 2-D image | Native 2D (Ideal) |\n",
         "| linear_spec | CQT 2-D image | Native 2D (Ideal) |\n",
-        "| lfcc | Linear Cepstral 2D matrix | 2D Matrix |\n",
-        "| logmel | Log-Mel + MFCC 2D matrix | 2D Matrix |\n",
+        "| logmel | Log-Mel spectrogram 2D matrix | 2D Matrix |\n",
+        "| mfcc | MFCC + delta + delta-delta 2D matrix | 2D Matrix |\n",
         "| ssl_embeddings | Wav2Vec2 hidden states | Reshaped 2D |\n",
     ]
     with open(path, "w") as f:
