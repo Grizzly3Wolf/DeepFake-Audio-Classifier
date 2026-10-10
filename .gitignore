@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Outputs (large generated files — do not push)
+outputs/
+
+# HuggingFace / dataset cache
+*.cache
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model checkpoints (large binary files)
+*.pth
+*.pt
+*.bin
+*.ckpt
+
+# NumPy feature arrays (large)
+*.npy
+
+# Logs
+*.log
+*.csv

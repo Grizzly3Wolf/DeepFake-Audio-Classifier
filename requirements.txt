@@ -1,0 +1,27 @@
+# Core audio/ML
+librosa>=0.10.0
+soundfile>=0.12.0
+PyWavelets>=1.4.0
+scipy>=1.11.0
+
+# HuggingFace
+datasets>=2.16.0
+transformers>=4.37.0
+huggingface-hub>=0.20.0
+
+# Deep learning
+torch>=2.1.0
+torchvision>=0.16.0
+timm>=0.9.12
+
+# Data science
+numpy>=1.24.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+
+# Visualization
+matplotlib>=3.8.0
+opencv-python>=4.8.0
+
+# Progress bars
+tqdm>=4.66.0
